@@ -1,0 +1,129 @@
+---
+title: "Evaluation of the Linear Composite Test in Diagnosing DED"
+author: "David Lin, Daniel Yang, Jiarui Zhang, Xinyi Zhang, Joseph Mercado"
+date: "April 12, 2019"
+output:
+  pdf_document:
+    pandoc_args: ["--extract-media", "."]
+runtime: shiny
+fig_width: 6
+fig_height: 4
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Background
+
+  In the previous project, we investigated the method of utilizing the data from both devices A and B and how this approach compares with just using data from a single device. We concluded that combining the data into a single linear composite test (LCT) yields a better result than using the readings from just one device. This was evident from the ROC curve the LCT produced, as it has a larger AUC relative to both devices. This meant that the linear composite test has a higher sensitivity and a higher specificity than device A or B. Although we concluded that the LCT is a better test in terms of diagnosing DED, we are unsure in the validity of the test or how well the test performs under different conditions. The LCT utilizes the EM algorithm for computing estimates, which can be quite sensitive to a variety of things, such as initial parameter values and the likelihood function, particularly since our likelihood function is a Gaussian mixture model. Consequently, we should consider different parameter cases and see how well the EM algorithm performs (i.e., how close the EM algorithm estimates are to the true parameter values). In this manner, we can assess the reliability of the method in diagnosing DED from the previous project, and determine which scenarios the EM algorithm does well in, and perhaps more importantly, which it does not.  We do so via a simulation study - a process of sampling simulated data from a model of the known parameters, and comparing the obtained estimates based on the simulated data with the true parameter values. In particular, the relative bias and efficiency are considered.    
+  
+To construct the simulations we must first determine the set of true parameters to use. For the simulation study we decided on 7 main scenarios, modified by the prevalence rate, the difference in means, and level of correlation. Sample size, while not a parameter, is also adjusted; we expect to see a better performance with a larger sample size, but it would be meaningful to identify how much better a result the larger sample size would produce. For each scenario, 100 simulations are considered. The following is a table consisting of the 7 main scenarios:
+
+![Table of Scenarios](C:/Users/David/Documents/scenarios.png)
+
+
+  $N$ was chosen to be 100 because it was close to the actual sample size of 114, and 200 to test how a large sample size would affect the EM algorithm estimates. $\mu_{0}$ was set to be the zero vector and $\mu_{1}$ to be $(3,2)$ because we are not interested in the actual values of the mean vectors, but rather the distance between the two groups. $(3,2)$ was chosen for $mu_{1}$ since in the previous project it was shown that the mean of the device A readings is higher than that of the device B readings. For simplicity, $Sigma_{0}$ and  $Sigma_{1}$ are assumed to be the same - this assumption should be challenged in future investigations. Similarly in the case for the means, the variance of the device A readings was larger than the device B readings, hence the larger relative variance for device A. Different covariance values were used to test how dependence would affect the EM algorithm estimates. Finally, the prevalence $\pi$ was set to 0.3 since this was the result obtained in the previous project, and 0.5 to test how a high prevalence would affect the EM algorithm estimates.
+
+##Methodology
+
+  The original data only consisted of measurements for tear osmolarity, but not the actual disease status $D_{i}$ of the individual; as part of our simulation study this is required to be known. In order to simulate the data, we first generate $N$ number of "individuals" from which the disease status follows the Bernoulli distribution with parameter $\pi$:
+  
+$$D_{i} \sim \text{Bernoulli}(\pi)$$
+  Where $\pi$ is decided based on the scenario. After simulating the disease status for each individual, we then proceed with simulating the tear osmolarity measurement readings $X_{i}$ for each individual. The readings are simulated from a bivariate normal distribution with parameters $\mu$ and $\Sigma$ based on whether or not the individual has the disease:
+
+$$X_{i} \sim N_{2}(\mu_{0},\Sigma_{0}) \text{ if } D_{i} = 0$$
+
+$$X_{i} \sim N_{2}(\mu_{1},\Sigma_{1}) \text{ if } D_{i} = 1$$
+  With the data set simulated we can now proceed to the EM algorithm. Our initial values are just the simulation parameter values perturbed by a small amount (0.01). The EM algorithm was imported from the R package 'mixtools' and the standard errors are calculated by the jackknife method. Since each scenario was simulated 100 times, each scenario will have 100 different $\hat{\theta_{i}}$ estimates and standard errors $SE_{i}$. By taking the average of these 100 simulated $\hat{\theta_{i}}$ and $SE_{i}$, we can obtain a single averaged $\hat{\theta}_{average}$ and $SE_{average}$. Using these averaged estimates, we can then calculate the relative bias and efficiency of these estimators:
+
+$$\text{Relative Bias}=\frac{\hat{\theta}_{average}-\theta}{\theta}\times 100\%$$
+$$\text{Relative Efficiency}=\frac{SE_{average}}{SD}\times100\%$$
+  Where $\theta$ is the true parameter from the scenario and SD is the standard deviation of the 100 different $\theta$ or $\sqrt{\text{Var}(\hat{\theta})}$.
+
+  Since the relative bias requires us to divide by the true parameter, it is unobtainable for parameters that was specified to be 0. For those parameters, we relied on using just the bias:
+
+$$\text{Bias}_{\theta}=\hat{\theta}_{average}-\theta$$
+
+  We finally consider the ROC curves and AUC value based on our true parameter values and the averaged simulation values for each scenario. If the EM algorithm performs well, then the ROC curve and AUC value should be close to each other. The ROC curve calculation remains unchanged from the previous project. Below is the computation of the AUC:
+
+$$AUC_{True} = \Phi\bigg(\frac{\mathbf{a}^{T}_{0}(\mathbf{\mu}_{1} -\mathbf{\mu}_{0}) }{\sqrt{\mathbf{a}^{T}_{0}(\mathbf\Sigma_{0} + \mathbf\Sigma_{1})\mathbf{a}_{0}}} \bigg)$$
+$$AUC_{simulation} = \Phi\bigg(\frac{\mathbf{a}^{T}_{sim}(\mathbf{\hat{\mu}}_{1} -\mathbf{\hat{\mu}}_{0}) }{\sqrt{\mathbf{a}^{T}_{sim}(\hat{\mathbf\Sigma_{0}} + \hat{\mathbf\Sigma_{1})}\mathbf{a}_{sim}}} \bigg)$$
+Where, $AUC_{LCT}$ is calculated using true parameters from the scenario, and $AUC_{simulation}$ is calculated using the estimates obtained from the simulation $\theta_{average}$.
+
+##Result
+#####Through our 7 simulated scenarios, we tested how the EM algorithm behaved under different parameters $\theta$. We decided on these parameters to mainly focused on the effects of:
+
+  * Separation between the diseased and non-diseased group ($\mu_{0}$,$\mu_{1}$)
+  * Correlation of device A and device B ($\rho$)
+  * Low and high prevalence ($\pi$)
+  * Large sample size ($N$)
+
+  When we were running the EM algorithm on the Gaussion mix tools, most of the scenarios converge 100 times in our 100 times repetition, while the scenario 5 only converges 12 times, which means we only have 12 set of estimates for scenario 5. As a result, we can expect the estimates from scenario 5 will not be as good as the other ones.  
+  First we look at the how well the EM algorithm managed to estimate the true parameters for each scenario. Below is a summary table of the converged values and standard errors for estimates of each scenario：
+
+Scenario  $\mu_{A1}$    $\mu_{B1}$  $\mu_{A0}$    $\mu_{B0}$  $Var_{A1}$  $Var_{B1}$  $Cov_{AB1}$   $Var_{A0}$  $Var_{B0}$  $Cov_{AB0}$ $\pi$
+--------  -----------   ----------- -----------   ----------  ----------- ----------  -----------   ----------  ----------- ----------- ------
+1         1.904         2.926       -0.016        -0.040      3.017       0.983       0.114         2.878       0.972       0.003       0.321
+2         1.957         2.967       -0.026        -0.026      2.929       1.046       0.068         2.936       0.982       0.004       0.311
+3         1.990         2.962       -0.027        -0.020      2.876       0.978       0.824         2.817       0.975       0.813       0.322
+4         1.867         2.859       -0.021        -0.052      3.030       1.125       1.343         2.865       0.948       1.151       0.331
+5         0.861         0.674       -0.117        -0.008      2.611       0.758       0.269         3.482       1.041       -0.339      0.389
+6         1.894         2.928       -0.015        -0.056      3.034       1.058       0.116         2.846       0.958       0.030       0.519
+7         1.960         2.953       -0.022        -0.032      2.878       1.065       0.883         2.923       0.984       0.846       0.314
+--------  -----------   ----------- -----------   ----------- -----------  ---------  -----------   ----------  ----------- ----------- ------
+Table: Table of simulated estimates
+
+Scenario  $\mu_{A1}$    $\mu_{B1}$  $\mu_{A0}$    $\mu_{B0}$  $Var_{A1}$  $Var_{B1}$  $Cov_{AB1}$   $Var_{A0}$  $Var_{B0}$  $Cov_{AB0}$ $\pi$
+--------  -----------   ----------- -----------   ----------  ----------- ----------  -----------   ----------  ----------- ----------- ------
+1         0.698         0.693       0.406         0.327       1.213       0.820       0.720         0.823       0.384       0.417       0.177
+2         0.389         0.398       0.212         0.184       0.755       0.485       0.423         0.475       0.247       0.228       0.090
+3         0.615         0.677       0.413         0.285       1.056       0.823       0.720         0.858       0.436       0.426       0.166
+4         0.696         0.735       0.380         0.317       1.214       0.890       0.876         0.761       0.375       0.400       0.178
+5         2.195         2.274       1.668         1.125       4.008       1.483       1.595         3.440       1.225       2.054       0.836
+6         1.539         1.225       0.939         0.705       2.603       1.048       1.259         1.837       0.761       0.865       0.438
+7         0.438         0.441       0.223         0.197       0.800       0.522       0.522         0.457       0.255       0.264       0.095
+--------  -----------   ----------- -----------   ----------- -----------  ---------  -----------   ----------  ----------- ----------- ------
+Table: Table of standard error of estimates.
+  
+  It can be seen in the table above, most of the scenarios estimated the true parameters quite well except scenario 5 (poorly separated). We can also see that aside from scenario 5, the estimates of the other scenarios do not defer significantly from each other.  This is most likely due to the simulation and the seed set (517) for the simulation. Again, we can see that the standard error of these estimates is highest in scenario 5 with little differences between the other scenarios. since the estimates were so similar to each other, It is hard to tell if scenario 2 was truly the best from just the looking at the estimates. However, by looking at the standard errors we can see that scenario 2 is not only marginally better in terms of estimates, but also has the lowest standard error. These estimates indicate that the separation between the two groups has a significant effect on how the EM algorithm estimates the true parameters. Whereas correlation, prevalence does not have as of a significant effect on the EM algorithm, and sample size of 100 is big enough for the EM. 
+We then looked at the Bias of these estimates to see if there are any other significant effects that was not clear in the estimates and the standard errors. Below is a table of the biases of the estimates:
+
+Scenario  $\mu_{A1}$    $\mu_{B1}$  $\mu_{A0}$    $\mu_{B0}$  $Var_{A1}$  $Var_{B1}$  $Cov_{AB1}$   $Var_{A0}$  $Var_{B0}$  $Cov_{AB0}$ $\pi$
+--------  -----------   ----------- -----------   ----------  ----------- ----------  -----------   ----------  ----------- ----------- ------
+1         4.771         2.462       -0.016        -0.043      0.579       1.617       0.114         4.064       2.751       0.003       7.149
+2         2.148         1.072       -0.026        -0.026      2.349       4.644       0.068         2.108       1.725       0.004       3.851
+3         0.463         1.235       -0.027        -0.020      4.131       2.145       4.775         0.608       2.497       6.020       7.634
+4         6.615         4.683       -0.021        -0.052      1.026       12.530      10.837        4.492       5.163       5.057       10.536
+5         13.891        132.558     -0.117        -0.008      12.938      24.110      0.269         16.093      4.195       -0.339      29.940
+6         5.256         2.389       -0.015        -0.056      1.135       5.844       0.116         5.131       4.107       0.030       3.973
+7         1.985         1.556       -0.022        -0.032      4.026       6.535       2.003         2.543       1.548       2.256       4.782    
+--------  -----------   ----------- -----------   ----------- -----------  ---------  -----------   ----------  ----------- ----------- ------
+Table: Table of biases of estimates 
+
+  It should be noted that the values for $\mu_{A0}$, $\mu_{B0}$, $Cov_{AB1}$, and $Cov_{AB0}$ are not the relative bias, but the regular bias. As mentioned before the relative bias is unobtainable when the parameter is 0. Of course this means that the $Cov_{AB1}$ and $Cov_{AB0}$ of scenario 3,4 and 7 are thre relative bias, since in those scenarios the devices are correlated. For reference, the relative bias should be below 5 (or 5%), and the values in red should be close to 0 to indicate an unbiased estimator. From previous findings, it is no surprise that scenario 5 and 6 have relative higher biases than other scenarios. However, now we see that Scenario 4 and 3 have the next highest biases, with more biases over 5% than other scenarios. This indicates that maybe correlation has a negative effect on the EM algorithm in terms of bias of the estimator. We can also see that the biases of the estimates from scenario 4 is also generally higher than that of scenario 3. This indicates that a the higher the correlation is between the two devices the more significant the effect is on the EM algorithm. By comparing scenario 1 and 3, we can also see that the biases are lower when the two devices are independent. This finding was surprising, since both devices measure tear osmolarity. Thus, you would expect the EM algorithm to be better when the two devices are highly correlated. However, as we can see from the findings above that a high correlation values has a significant effect on the biases of the estimates. Finally we look at the efficiency to see if there are any other unobserved effects. Below is a table of the efficiency of the estimates: 
+
+Scenario  $\mu_{A1}$    $\mu_{B1}$  $\mu_{A0}$    $\mu_{B0}$   $Var_{A1}$   $Var_{B1}$  $Cov_{AB1}$   $Var_{A0}$  $Var_{B0}$  $Cov_{AB0}$ $\pi$
+--------  -----------   ----------- -----------   ----------   -----------  ----------  -----------   ----------  ----------- ----------- ------
+1         1.512         1.531       1.595         1.456        0.969        1.519       1.276         1.405       1.377       1.492       1.504
+2         1.147         1.426       1.281         1.287        1.046        1.361       1.225         1.157       1.337       1.125       1.447
+3         1.152         1.251       1.188         1.070        1.126        1.234       1.196         1.383       1.392       1.249       1.321
+4         1.399         1.490       1.293         1.599        0.974        1.303       1.066         1.227       1.519       1.231       1.429
+5         3.615         3.095       2.642         3.147        1.935        2.765       3.371         2.257       1.856       1.511       3.208
+6         1.699         1.632       1.378         1.663        1.213        1.465       1.443         1.355       1.713       1.366       1.855
+7         1.044         1.251       1.239         1.245        1.026        1.207       1.010         1.072       1.118       1.133       1.286
+--------  -----------   ----------- -----------   -----------  -----------  ---------   -----------   ----------  ----------- ----------- ------
+Table: Table of efficiency of estimates.
+
+  The efficiency is the ratio between the expected values of the standard error and the standard deviation. Thus, a good estimator should have an efficiency close to 1. Again we can see that there is no significant differences between the efficiencies of the estimates, with the exception of scenario 5. We can also see that scenario 2 still has the overall best efficiency when compared to the other scenarios. It should be noted that although most of these efficiencies are close to 1, most are also greater than 1. This indicates that although the EM algorithm is good method at obtaining efficient estimates, the standard error of these estimates generally over estimate the standard deviation. 
+  
+  From these findings, we can see that scenario 2 yielded the best estimates, standard errors, biases and efficiency. This is to be expected since we found that the EM algorithm will get the best estimates when the separation between the two groups is well defined, low prevalence rate, and when the devices are independent. Since scenario 2 has all these characteristics and has the largest sample size, we should expect scenario 2 to yield the best results. Furthermore, since the estimates we obtained are maximum likelihood estimates, we expect the estimates to get better as the sample size increases. However, if we compare scenario 1 and 2, we can see that although a large sample size does better in the EM algorithm in terms of estimating the parameters, it is only marginally better. This indicates that the large sample effect kicks in very early, and that sample size of 100 is good enough.
+
+  This analysis was done to see how well the EM algorithm is at estimating the true parameters. Through our analysis we found that, the EM algorithm preforms best when the diseased and non-diseased group are well separated, as well as a low prevalence and a low correlation between device A and device B (independent). Of course a large sample size is always better, but our findings show that a sample size of 200 only betters the estimate marginally. However, our conclusion is that the only factor that has a significance on the EM algorithm is the separation between the two groups. When the two groups are poorly separated, the estimates produced by the EM is biased and inefficient. When the two groups are well separated, the effects of correlation and prevalence are only marginal. This can also be seen in the ROC curves: 
+  
+![ROC curve](C:/Users/David/Documents/ROC.png)
+ 
+
+  It should be noted that although the ROC curve on the left is from scenario 2, all the scenario with well separated groups yielded an identical ROC curve, with the only difference in the AUC. We can see that when the two groups are well separated the EL algorithm is more able to identify the true ROC. When poorly separated we can see that the simulated ROC is quite different from the true ROC as well as a significant decrease in AUC. This indicates that when the two groups are poorly separated, regardless of the other factors, the EM algorithm will have problem identifying the true parameters and thus result in a test that has a lower probability of diagnosing correctly.
+
+  By applying these new findings to the overall problem at hand, It is clear that EM algorithm can estimates the true distribution well in our project 2 for finding the real distribution of the Gaussion mixture model. The EM algorithm produces best results when the two devices are independent, which suggest that maybe testing with two independent distributions is more feasible than which with correlated distributions. However, from our findings through these projects, we suggest that using the EM algorithm in project 2 can estimate the parameters of the diseased and undiseased patients distributions of device A and B is feasible.
